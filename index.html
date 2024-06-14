@@ -1,0 +1,207 @@
+<?php
+session_start();
+
+// Define upload directory
+$uploadDir = 'UploadedImages/';
+
+if (isset($_POST['btnUpload'])) {
+    if (!empty($_FILES['uploadedFiles']['name'][0])) {
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0777, true);
+        }
+
+        $uploadedImagesPaths = [];
+        foreach ($_FILES['uploadedFiles']['tmp_name'] as $key => $tmp_name) {
+            $fileName = basename($_FILES['uploadedFiles']['name'][$key]);
+            $filePath = $uploadDir . $fileName;
+            move_uploaded_file($tmp_name, $filePath);
+            $uploadedImagesPaths[] = $filePath;
+        }
+        $_SESSION['UploadedImagesPaths'] = $uploadedImagesPaths;
+    }
+}
+
+if (isset($_POST['btnDownload'])) {
+    if (!empty($_SESSION['UploadedImagesPaths'])) {
+        foreach ($_SESSION['UploadedImagesPaths'] as $imagePath) {
+            $mainImagePathOnServer = $imagePath;
+            $overlayImagePath = 'images/QrCode.jpg'; // Change to JPEG format
+
+            if (file_exists($mainImagePathOnServer) && file_exists($overlayImagePath)) {
+                // Load main image (JPEG)
+                $mainImage = imagecreatefromjpeg($mainImagePathOnServer);
+
+                // Load overlay image (JPEG)
+                $overlayImage = imagecreatefromjpeg($overlayImagePath);
+
+                if ($mainImage !== false && $overlayImage !== false) {
+                    // Resize overlay image
+                    $newWidth = 260;
+                    $newHeight = 300;
+                    $resizedOverlayImage = imagescale($overlayImage, $newWidth, $newHeight);
+
+                    // Copy overlay image onto main image
+                    imagecopy($mainImage, $resizedOverlayImage, imagesx($mainImage) - $newWidth - 40, 35, 0, 0, $newWidth, $newHeight);
+
+                    // Add company title background
+                    $companyTitle = "Nisha Dresses";
+                    $fontPath = 'C:/xampp/htdocs/ImageUpdate/fonts/arial.ttf'; // Update with actual font path
+                    $fontSize = 30;
+
+                    // Set Dark DeepPink background
+                      $titleColor = imagecolorallocate($mainImage, 255, 20, 147); // DeepPink
+
+                    // Check if the font path is valid
+                    if (file_exists($fontPath)) {
+                        // Draw filled rectangle as background for company title
+                        $bbox = imagettfbbox($fontSize, 0, $fontPath, $companyTitle);
+                        $textWidth = $bbox[4] - $bbox[0];
+                        $textHeight = $bbox[1] - $bbox[7];
+                        $bgWidth = $textWidth + 20; // Adjust as needed for padding
+                        $bgHeight = $textHeight + 10; // Adjust as needed for padding
+                        $bgX = 45; // X position of the background rectangle
+                        $bgY = 100; // Y position of the background rectangle
+                        imagefilledrectangle($mainImage, $bgX, $bgY, $bgX + $bgWidth, $bgY + $bgHeight, $titleColor);
+
+                        // Add company title text
+                        $textColor = imagecolorallocate($mainImage, 255, 255, 255); // White
+                        imagettftext($mainImage, $fontSize, 0, $bgX + 10, $bgY + $bgHeight - 5, $textColor, $fontPath, $companyTitle);
+                    } else {
+                        echo 'Invalid font path: ' . $fontPath;
+                    }
+
+                    // Add phone number
+                    $phoneNumber = "99248 20555";
+                    $phoneFontSize = 85;
+                    $phoneColor = imagecolorallocate($mainImage, 255, 0, 0); // Red
+                    imagettftext($mainImage, $phoneFontSize, 0, (imagesx($mainImage) - 500) / 2, (imagesy($mainImage) + 85) / 2, $phoneColor, $fontPath, $phoneNumber);
+
+                    // Save the processed image permanently
+                    $processedImageFilename = 'processed_image_' . time() . '.png';
+                    imagepng($mainImage, $uploadDir . $processedImageFilename);
+
+                    // Clean up resources
+                    imagedestroy($mainImage);
+                    imagedestroy($resizedOverlayImage);
+
+                    // Provide download link to the processed image
+                    echo '<div class="download-link">';
+                    echo '<a href="' . $uploadDir . $processedImageFilename . '" download>Download Processed Image</a>';
+                    echo '</div>';
+                } else {
+                    echo 'Error loading image files.';
+                }
+            } else {
+                echo 'Main image or overlay image not found.';
+            }
+        }
+    } else {
+        echo 'No images uploaded yet.';
+    }
+}
+
+if (isset($_POST['btnDeleteUpload'])) {
+    if (!empty($_SESSION['UploadedImagesPaths'])) {
+        foreach ($_SESSION['UploadedImagesPaths'] as $imagePath) {
+            if (file_exists($imagePath)) {
+                unlink($imagePath);
+            }
+        }
+        $_SESSION['UploadedImagesPaths'] = [];
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overlay Images</title>
+    <style>
+        body, h1, p, ul {
+            margin: 0;
+            padding: 0;
+        }
+
+        .file {
+            margin: 20px;
+        }
+
+        .image-container {
+            position: relative;
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+        }
+
+        .main-image {
+            width: 100%;
+            height: auto;
+        }
+
+        .overlay-image {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30%;
+            max-width: 150px;
+            height: auto;
+        }
+
+        .company-title {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            text-align: center;
+            background-color: #8B008B; /* Dark DeepPink */
+            color: white;
+            padding: 5px;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+
+        .download-link {
+            display: block;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        @media screen and (max-width: 768px) {
+            .menu-toggle {
+                display: block;
+            }
+
+            .menu {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <form method="post" enctype="multipart/form-data">
+        <div class="file">
+            <p>Upload Images:</p>
+            <input type="file" name="uploadedFiles[]" multiple>
+        </div>
+        <br><br>
+        <button type="submit" name="btnUpload">Upload Images</button>
+        <br><br>
+        <button type="submit" name="btnDownload">Download Images</button>
+        <br><br>
+        <button type="submit" name="btnDeleteUpload">Delete Uploaded Images</button>
+    </form>
+
+    <div>
+        <?php if (!empty($_SESSION['UploadedImagesPaths'])) {
+            foreach ($_SESSION['UploadedImagesPaths'] as $imagePath) { ?>
+                <div class="image-container">
+                    <img src="<?= $imagePath ?>" class="main-image" alt="Main Image">
+                    <img src="images/QrCode.jpg" class="overlay-image" alt="Overlay Image">
+                    <div class="company-title">Nisha Dresses</div>
+                    <div style="text-align: center; font-size: 40px;">99248 20555</div>
+                </div>
+            <?php }
+        } ?>
+    </div>
+</body>
+</html>
